@@ -9,3 +9,15 @@ data/results/*.csv
 slurm-*.out
 *.log
 .ipynb_checkpoints/
+
+# Cluster outputs
+slurm-*.out
+slurm-*.err
+data/results/
+*.log
+
+# Python / environments
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
