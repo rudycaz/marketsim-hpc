@@ -1,10 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-
+from fastapi.middleware.cors import CORSMiddleware
 from marketsim.forecast import forecast_ticker
 
 app = FastAPI(title="MarketSim HPC API", version="0.1.0")
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ForecastRequest(BaseModel):
     ticker: str = Field(..., examples=["CVX"])
