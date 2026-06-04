@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarketSim HPC</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>MarketSim HPC</h1>
+    <p>Private stock trend forecasting research dashboard.</p>
+
+    <form id="forecast-form">
+      <label>Ticker
+        <input id="ticker" value="CVX" required />
+      </label>
+
+      <label>Horizon
+        <select id="horizon">
+          <option value="week">Week</option>
+          <option value="month" selected>Month</option>
+          <option value="year">Year</option>
+          <option value="longterm">5+ Years</option>
+        </select>
+      </label>
+
+      <label>Simulations
+        <input id="simulations" type="number" value="100000" min="1000" />
+      </label>
+
+      <button type="submit">Run Forecast</button>
+    </form>
+
+    <pre id="output">Start the backend, then run a forecast.</pre>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

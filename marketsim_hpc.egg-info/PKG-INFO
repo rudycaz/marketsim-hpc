@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: marketsim-hpc
+Version: 0.1.0
+Summary: A private HPC stock trend forecasting simulator using Monte Carlo simulation and real market data.
+Requires-Python: >=3.10

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+data/cached_prices/*.csv
+data/results/*.json
+data/results/*.csv
+slurm-*.out
+*.log
+.ipynb_checkpoints/
