@@ -1,10 +1,6 @@
 import argparse
 import json
 from pathlib import Path
-import sys
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
 
 from marketsim.forecast import forecast_ticker
 
@@ -17,9 +13,17 @@ def money(value: float) -> str:
     return f"${value:,.2f}"
 
 
+def safe_filename(value: str) -> str:
+    return value.replace("/", "_").replace(" ", "_")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="MarketSim HPC stock trend forecast")
-    parser.add_argument("--ticker", required=True, help="Stock ticker, e.g. CVX")
+    parser = argparse.ArgumentParser(description="MarketSim HPC stock and crypto trend forecast")
+    parser.add_argument(
+        "--ticker",
+        required=True,
+        help="Stock ticker or crypto symbol, e.g. CVX, NVDA, BTC, bitcoin, BTC-USD",
+    )
     parser.add_argument("--horizon", required=True, choices=["week", "month", "year", "longterm"])
     parser.add_argument("--simulations", type=int, default=100_000)
     parser.add_argument("--seed", type=int, default=42)
@@ -31,7 +35,8 @@ def main() -> None:
 
     if args.save:
         Path("data/results").mkdir(parents=True, exist_ok=True)
-        out = Path("data/results") / f"{result['ticker']}_{args.horizon}_{args.simulations}.json"
+        filename = f"{safe_filename(result['ticker'])}_{args.horizon}_{args.simulations}.json"
+        out = Path("data/results") / filename
         out.write_text(json.dumps(result, indent=2))
 
     if args.json:
@@ -42,7 +47,10 @@ def main() -> None:
     print("=" * 60)
     print("MarketSim HPC Forecast")
     print("=" * 60)
-    print(f"Ticker:            {result['ticker']}")
+    print(f"Input Symbol:      {result['input_symbol']}")
+    print(f"Resolved Symbol:   {result['ticker']}")
+    print(f"Asset Type:        {result['asset_type']}")
+    print(f"Name:              {result['display_name']}")
     print(f"Horizon:           {result['horizon_label']}")
     print(f"Simulations:       {result['simulations']:,}")
     print(f"Current Price:     {money(sim['current_price'])}")

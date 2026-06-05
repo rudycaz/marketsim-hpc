@@ -16,7 +16,7 @@ app.add_middleware(
 )
 
 class ForecastRequest(BaseModel):
-    ticker: str = Field(..., examples=["CVX"])
+    ticker: str = Field(..., examples=["CVX", "BTC", "bitcoin", "BTC-USD"])
     horizon: str = Field(..., examples=["month"])
     simulations: int = Field(100_000, ge=1000, le=10_000_000)
     seed: int = 42

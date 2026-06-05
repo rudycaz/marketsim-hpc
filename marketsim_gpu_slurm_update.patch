@@ -1,0 +1,343 @@
+From d056c80c0763b51217a7b0ba431bce71d4c036f2 Mon Sep 17 00:00:00 2001
+From: Rudy Cazares <rudyczares16@gmail.com>
+Date: Thu, 4 Jun 2026 15:41:35 -0700
+Subject: [PATCH] Add GPU SLURM batch workflow for stock forecasts
+
+---
+ .gitignore                           | 12 ++++
+ cluster/slurm_batch_forecasts_gpu.sh | 85 ++++++++++++++++++++++++++++
+ cluster/slurm_forecast_gpu.sh        | 42 ++++++++++++++
+ cluster/slurm_week.sh                | 33 +++++++----
+ cluster/slurm_week_gpu.sh            | 34 +++++++++++
+ cluster/submit_stock_jobs.sh         | 49 ++++++++++++++++
+ docs/CLUSTER_GPU_WORKFLOW.md         | 15 +++++
+ 7 files changed, 259 insertions(+), 11 deletions(-)
+ create mode 100755 cluster/slurm_batch_forecasts_gpu.sh
+ create mode 100755 cluster/slurm_forecast_gpu.sh
+ create mode 100644 cluster/slurm_week_gpu.sh
+ create mode 100755 cluster/submit_stock_jobs.sh
+ create mode 100644 docs/CLUSTER_GPU_WORKFLOW.md
+
+diff --git a/.gitignore b/.gitignore
+index b374be4..cee661b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -9,3 +9,15 @@ data/results/*.csv
+ slurm-*.out
+ *.log
+ .ipynb_checkpoints/
++
++# Cluster outputs
++slurm-*.out
++slurm-*.err
++data/results/
++*.log
++
++# Python / environments
++.venv/
++__pycache__/
++*.pyc
++.pytest_cache/
+diff --git a/cluster/slurm_batch_forecasts_gpu.sh b/cluster/slurm_batch_forecasts_gpu.sh
+new file mode 100755
+index 0000000..c2695b0
+--- /dev/null
++++ b/cluster/slurm_batch_forecasts_gpu.sh
+@@ -0,0 +1,85 @@
++#!/bin/bash
++#SBATCH --job-name=marketsim_batch
++#SBATCH --partition=gpu
++#SBATCH --nodes=1
++#SBATCH --ntasks=1
++#SBATCH --cpus-per-task=1
++#SBATCH --gres=gpu:a100:1
++#SBATCH --time=04:00:00
++#SBATCH --mem=8G
++#SBATCH --output=slurm-batch-%j.out
++#SBATCH --error=slurm-batch-%j.err
++
++echo "========================================"
++echo "MarketSim HPC Batch Forecast Job"
++echo "Node: $(hostname)"
++echo "Started: $(date)"
++echo "========================================"
++
++source .venv/bin/activate
++
++echo "GPU info:"
++nvidia-smi
++
++mkdir -p data/results
++
++TICKERS=(
++    CVX
++    RKLB
++    MU
++    NVDA
++    BA
++    AAPL
++    MSFT
++    AMZN
++    GOOGL
++    META
++    TSLA
++    AMD
++    XOM
++    JPM
++    WMT
++)
++
++HORIZONS=(
++    week
++    month
++    year
++    longterm
++)
++
++for TICKER in "${TICKERS[@]}"; do
++    for HORIZON in "${HORIZONS[@]}"; do
++
++        if [ "$HORIZON" = "week" ]; then
++            SIMULATIONS=100000
++        elif [ "$HORIZON" = "month" ]; then
++            SIMULATIONS=250000
++        elif [ "$HORIZON" = "year" ]; then
++            SIMULATIONS=250000
++        elif [ "$HORIZON" = "longterm" ]; then
++            SIMULATIONS=100000
++        fi
++
++        echo "----------------------------------------"
++        echo "Running forecast"
++        echo "Ticker: $TICKER"
++        echo "Horizon: $HORIZON"
++        echo "Simulations: $SIMULATIONS"
++        echo "Started: $(date)"
++        echo "----------------------------------------"
++
++        python -m cli.predict \
++            --ticker "$TICKER" \
++            --horizon "$HORIZON" \
++            --simulations "$SIMULATIONS" \
++            | tee "data/results/${TICKER}_${HORIZON}_${SIMULATIONS}.txt"
++
++        echo "Finished $TICKER $HORIZON at $(date)"
++        echo
++    done
++done
++
++echo "========================================"
++echo "Batch job finished: $(date)"
++echo "========================================"
+diff --git a/cluster/slurm_forecast_gpu.sh b/cluster/slurm_forecast_gpu.sh
+new file mode 100755
+index 0000000..1f7a479
+--- /dev/null
++++ b/cluster/slurm_forecast_gpu.sh
+@@ -0,0 +1,42 @@
++#!/bin/bash
++#SBATCH --job-name=marketsim
++#SBATCH --partition=gpu
++#SBATCH --nodes=1
++#SBATCH --ntasks=1
++#SBATCH --cpus-per-task=1
++#SBATCH --gres=gpu:a100:1
++#SBATCH --time=00:30:00
++#SBATCH --mem=8G
++#SBATCH --output=slurm-forecast-%x-%j.out
++#SBATCH --error=slurm-forecast-%x-%j.err
++
++TICKER=$1
++HORIZON=$2
++SIMULATIONS=$3
++
++if [ -z "$TICKER" ] || [ -z "$HORIZON" ] || [ -z "$SIMULATIONS" ]; then
++    echo "Usage: sbatch cluster/slurm_forecast_gpu.sh TICKER HORIZON SIMULATIONS"
++    echo "Example: sbatch cluster/slurm_forecast_gpu.sh CVX month 100000"
++    exit 1
++fi
++
++echo "========================================"
++echo "MarketSim HPC Forecast"
++echo "Ticker: $TICKER"
++echo "Horizon: $HORIZON"
++echo "Simulations: $SIMULATIONS"
++echo "Node: $(hostname)"
++echo "Started: $(date)"
++echo "========================================"
++
++source .venv/bin/activate
++
++echo "GPU info:"
++nvidia-smi
++
++echo "Running forecast..."
++python -m cli.predict --ticker "$TICKER" --horizon "$HORIZON" --simulations "$SIMULATIONS"
++
++echo "========================================"
++echo "Finished: $(date)"
++echo "========================================"
+diff --git a/cluster/slurm_week.sh b/cluster/slurm_week.sh
+index 5df6e82..c14b614 100755
+--- a/cluster/slurm_week.sh
++++ b/cluster/slurm_week.sh
+@@ -1,18 +1,29 @@
+ #!/bin/bash
+ #SBATCH --job-name=marketsim_week
+-#SBATCH --nodes=2
+-#SBATCH --ntasks-per-node=8
+-#SBATCH --time=00:20:00
+-#SBATCH --mem=8G
+-#SBATCH --output=slurm-%j.out
++#SBATCH --partition=pi.amartini
++#SBATCH --nodes=1
++#SBATCH --ntasks=1
++#SBATCH --cpus-per-task=1
++#SBATCH --time=00:15:00
++#SBATCH --mem=4G
++#SBATCH --output=slurm-week-%j.out
++#SBATCH --error=slurm-week-%j.err
+ 
+-set -euo pipefail
++TICKER=$1
++SIMULATIONS=$2
+ 
+-TICKER=${1:-CVX}
+-SIMULATIONS=${2:-1000000}
++echo "========================================"
++echo "MarketSim HPC Week Forecast"
++echo "Ticker: $TICKER"
++echo "Simulations: $SIMULATIONS"
++echo "Node: $(hostname)"
++echo "Started: $(date)"
++echo "========================================"
+ 
+-module load python || true
+-module load openmpi || true
+ source .venv/bin/activate
+ 
+-mpirun python -m cluster.monte_carlo_mpi --ticker "$TICKER" --horizon week --simulations "$SIMULATIONS"
++python -m cli.predict --ticker "$TICKER" --horizon week --simulations "$SIMULATIONS"
++
++echo "========================================"
++echo "Finished: $(date)"
++echo "========================================"
+diff --git a/cluster/slurm_week_gpu.sh b/cluster/slurm_week_gpu.sh
+new file mode 100644
+index 0000000..cdd0ab9
+--- /dev/null
++++ b/cluster/slurm_week_gpu.sh
+@@ -0,0 +1,34 @@
++#!/bin/bash
++#SBATCH --job-name=marketsim_week_gpu
++#SBATCH --partition=gpu
++#SBATCH --nodes=1
++#SBATCH --ntasks=1
++#SBATCH --cpus-per-task=1
++#SBATCH --gres=gpu:a100:1
++#SBATCH --time=00:15:00
++#SBATCH --mem=8G
++#SBATCH --output=slurm-week-gpu-%j.out
++#SBATCH --error=slurm-week-gpu-%j.err
++
++TICKER=$1
++SIMULATIONS=$2
++
++echo "========================================"
++echo "MarketSim HPC GPU Partition Forecast"
++echo "Ticker: $TICKER"
++echo "Simulations: $SIMULATIONS"
++echo "Node: $(hostname)"
++echo "Started: $(date)"
++echo "========================================"
++
++source .venv/bin/activate
++
++echo "GPU info:"
++nvidia-smi
++
++echo "Running forecast..."
++python -m cli.predict --ticker "$TICKER" --horizon week --simulations "$SIMULATIONS"
++
++echo "========================================"
++echo "Finished: $(date)"
++echo "========================================"
+diff --git a/cluster/submit_stock_jobs.sh b/cluster/submit_stock_jobs.sh
+new file mode 100755
+index 0000000..4fd7bc1
+--- /dev/null
++++ b/cluster/submit_stock_jobs.sh
+@@ -0,0 +1,49 @@
++#!/bin/bash
++
++TICKERS=(
++    CVX
++    RKLB
++    MU
++    NVDA
++    BA
++    AAPL
++    MSFT
++    AMZN
++    GOOGL
++    META
++    TSLA
++    AMD
++    XOM
++    JPM
++    WMT
++)
++
++HORIZONS=(
++    week
++    month
++    year
++    longterm
++)
++
++for TICKER in "${TICKERS[@]}"; do
++    for HORIZON in "${HORIZONS[@]}"; do
++
++        if [ "$HORIZON" = "week" ]; then
++            SIMULATIONS=100000
++        elif [ "$HORIZON" = "month" ]; then
++            SIMULATIONS=250000
++        elif [ "$HORIZON" = "year" ]; then
++            SIMULATIONS=250000
++        elif [ "$HORIZON" = "longterm" ]; then
++            SIMULATIONS=100000
++        else
++            SIMULATIONS=100000
++        fi
++
++        echo "Submitting $TICKER $HORIZON with $SIMULATIONS simulations"
++        sbatch cluster/slurm_forecast_gpu.sh "$TICKER" "$HORIZON" "$SIMULATIONS"
++
++        sleep 1
++    done
++done
++
+diff --git a/docs/CLUSTER_GPU_WORKFLOW.md b/docs/CLUSTER_GPU_WORKFLOW.md
+new file mode 100644
+index 0000000..f778f3e
+--- /dev/null
++++ b/docs/CLUSTER_GPU_WORKFLOW.md
+@@ -0,0 +1,15 @@
++# Cluster GPU Workflow
++
++This project can run MarketSim HPC forecasts on the school cluster using SLURM.
++
++## Working Partition
++
++The working partition is:
++
++```text
++gpu
++
++
++GRES: gpu:a100:2
++Nodes: gnode[001-008]
++Max time: 3 days
+-- 
+2.52.0
+

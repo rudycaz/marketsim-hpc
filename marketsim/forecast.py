@@ -1,5 +1,6 @@
 from typing import Dict
 
+from marketsim.assets import normalize_asset_symbol
 from marketsim.config import validate_horizon
 from marketsim.data_fetcher import fetch_price_history
 from marketsim.features import compute_daily_returns, momentum_score, volatility_risk_score
@@ -9,9 +10,9 @@ from marketsim.scoring import compute_trend_score, label_from_score
 
 def forecast_ticker(ticker: str, horizon: str, simulations: int = 100_000, seed: int = 42) -> Dict:
     config = validate_horizon(horizon)
-    ticker = ticker.upper().strip()
+    asset = normalize_asset_symbol(ticker)
 
-    prices = fetch_price_history(ticker, period=config.lookback_period)
+    prices = fetch_price_history(asset.symbol, period=config.lookback_period)
     current_price = float(prices["Close"].iloc[-1])
     daily_returns = compute_daily_returns(prices)
 
@@ -28,7 +29,11 @@ def forecast_ticker(ticker: str, horizon: str, simulations: int = 100_000, seed:
     trend_score = compute_trend_score(sim.probability_up, sim.expected_return, momentum, risk)
 
     return {
-        "ticker": ticker,
+        "ticker": asset.symbol,
+        "input_symbol": asset.input_symbol,
+        "asset_type": asset.asset_type,
+        "display_name": asset.display_name,
+        "currency": asset.currency,
         "horizon": horizon,
         "horizon_label": config.label,
         "simulations": simulations,
