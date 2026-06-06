@@ -1,18 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=marketsim_batch
+#SBATCH --job-name=marketsim_crypto
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:a100:1
-#SBATCH --time=04:00:00
+#SBATCH --time=01:30:00
 #SBATCH --mem=8G
-#SBATCH --output=slurm-batch-%j.out
-#SBATCH --error=slurm-batch-%j.err
+#SBATCH --output=slurm-crypto-%j.out
+#SBATCH --error=slurm-crypto-%j.err
 
 echo "========================================"
-echo "MarketSim HPC Batch Forecast Job"
-echo "Stocks + Crypto"
+echo "MarketSim HPC Crypto Forecast Job"
 echo "Node: $(hostname)"
 echo "Started: $(date)"
 echo "========================================"
@@ -25,21 +24,6 @@ nvidia-smi
 mkdir -p data/results
 
 ASSETS=(
-    CVX
-    RKLB
-    MU
-    NVDA
-    BA
-    AAPL
-    MSFT
-    AMZN
-    GOOGL
-    META
-    TSLA
-    AMD
-    XOM
-    JPM
-    WMT
     BTC
     ETH
     SOL
@@ -72,21 +56,19 @@ for ASSET in "${ASSETS[@]}"; do
         fi
 
         echo "----------------------------------------"
-        echo "Running forecast"
+        echo "Running crypto forecast"
         echo "Asset: $ASSET"
         echo "Horizon: $HORIZON"
         echo "Simulations: $SIMULATIONS"
         echo "Started: $(date)"
         echo "----------------------------------------"
 
-        SAFE_ASSET=$(echo "$ASSET" | tr '/' '_' | tr ' ' '_')
-
         python -m cli.predict \
             --ticker "$ASSET" \
             --horizon "$HORIZON" \
             --simulations "$SIMULATIONS" \
             --save \
-            | tee "data/results/${SAFE_ASSET}_${HORIZON}_${SIMULATIONS}.txt"
+            | tee "data/results/${ASSET}_${HORIZON}_${SIMULATIONS}.txt"
 
         echo "Finished $ASSET $HORIZON at $(date)"
         echo
@@ -94,5 +76,5 @@ for ASSET in "${ASSETS[@]}"; do
 done
 
 echo "========================================"
-echo "Batch job finished: $(date)"
+echo "Crypto batch job finished: $(date)"
 echo "========================================"
